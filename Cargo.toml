@@ -1,0 +1,21 @@
+[package]
+name = "wgpu-voxels"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+winit = "0.27.5"
+env_logger = "0.10.0"
+log = "0.4.17"
+wgpu = "0.14.2"
+pollster = "0.2.5"
+crossbeam = "0.8.2"
+bytemuck = { version = "1.12.3", features = ["derive"] }
+cgmath = "0.17.0"
+instant = "0.1.12"
+image = "0.24.5"
+anyhow = "1.0.66"
+serde = { version = "1.0.149", features = ["derive"] }
+serde_json = "1.0.89"
