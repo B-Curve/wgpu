@@ -1,5 +1,8 @@
 use std::time::Duration;
 use cgmath::{Deg, vec3};
+use indoc::indoc;
+use wgpu::util::StagingBelt;
+use wgpu_glyph::{GlyphBrush, GlyphBrushBuilder, Section, Text};
 use winit::dpi::PhysicalPosition;
 use winit::event::{ElementState, KeyboardInput, MouseButton, WindowEvent};
 use winit::window::Window;
@@ -9,6 +12,7 @@ use crate::scene::projection::Projection;
 use crate::engine::block_pipeline;
 use crate::engine::block_pipeline::{BlockPipeline, DrawBlock};
 use crate::engine::texture::Texture;
+use crate::world::world::World;
 
 pub struct State {
     surface: wgpu::Surface,
@@ -17,15 +21,19 @@ pub struct State {
     config: wgpu::SurfaceConfiguration,
     size: winit::dpi::PhysicalSize<u32>,
 
+    staging_belt: StagingBelt,
+    glyph_brush: GlyphBrush<()>,
+
     depth_texture: Texture,
 
     camera: Camera,
     camera_uniform: CameraUniform,
     projection: Projection,
+
+    world: World,
 }
 
 impl State {
-
     pub async fn new(window: &Window) -> Self {
         let size = window.inner_size();
 
@@ -53,14 +61,25 @@ impl State {
             alpha_mode: wgpu::CompositeAlphaMode::Auto,
         };
 
-        let camera = Camera::new(vec3(0.0, 0.0, 0.0), Deg(0.0), Deg(0.0));
+        let camera = Camera::new(vec3(0.0, 70.0, 0.0), Deg(0.0), Deg(0.0));
         let camera_uniform = CameraUniform::new();
 
         let (width, height) = (config.width, config.height);
 
-        let projection = Projection::new(width, height, Deg(90.0), 0.1, 100.0);
+        let projection = Projection::new(width, height, Deg(90.0), 0.1, 1000.0);
 
         let depth_texture = Texture::create_depth_texture(&device, &config, "depth_texture");
+
+        let mut world = World::new(8);
+        world.generate(&camera);
+
+        let staging_belt = StagingBelt::new(1024);
+
+        let font = wgpu_glyph::ab_glyph::FontArc::try_from_slice(include_bytes!("../../assets/fonts/YatraOne-Regular.ttf"))
+            .unwrap();
+
+        let mut glyph_brush = GlyphBrushBuilder::using_font(font)
+            .build(&device, config.format);
 
         Self {
             surface,
@@ -68,10 +87,13 @@ impl State {
             queue,
             config,
             size,
+            staging_belt,
+            glyph_brush,
             depth_texture,
             camera,
             camera_uniform,
             projection,
+            world,
         }
     }
 
@@ -109,6 +131,8 @@ impl State {
         dt: Duration,
         pipeline: &mut BlockPipeline,
     ) {
+        self.world.update(&self.device, &self.camera);
+
         self.camera.update(dt);
         self.camera_uniform.update(&self.camera, &self.projection);
 
@@ -118,6 +142,7 @@ impl State {
     pub fn render(
         &mut self,
         block_pipeline: &BlockPipeline,
+        fps: u32,
     ) -> Result<(), wgpu::SurfaceError> {
         let output = self.surface.get_current_texture()?;
 
@@ -154,11 +179,61 @@ impl State {
             });
 
             use crate::engine::block_pipeline::DrawBlock;
-            render_pass.draw_mesh(block_pipeline);
+            let buffers = self.world.buffers();
+
+            buffers
+                .iter()
+                .for_each(|b| {
+                    render_pass.draw_mesh(b, block_pipeline);
+                });
+
+            buffers
+                .iter()
+                .for_each(|b| {
+                    render_pass.draw_alpha_mesh(b, block_pipeline);
+                });
         }
+
+        let p = self.camera.position();
+
+        let (w, h) = (self.config.width as f32, self.config.height as f32);
+
+        self.glyph_brush.queue(Section {
+            screen_position: (5.0, 0.0),
+            bounds: (w, h),
+            text: vec![
+                Text::new(&format!(
+                    indoc! {"
+                        FPS: {}
+                        Position: [{:.2}, {:.2}, {:.2}]
+                    "}, fps, p.x, p.y, p.z)
+                ).with_scale(40.0).with_color([1.0, 1.0, 1.0, 1.0])
+            ],
+            ..Section::default()
+        });
+
+        self.glyph_brush.queue(Section {
+            screen_position: (w / 2.0 - 30.0, h / 2.0 - 30.0),
+            bounds: (w, h),
+            text: vec![Text::new("+").with_scale(60.0).with_color([1.0, 1.0, 1.0, 1.0])],
+            ..Section::default()
+        });
+
+        self.glyph_brush.draw_queued(
+            &self.device,
+            &mut self.staging_belt,
+            &mut encoder,
+            &view,
+            self.config.width,
+            self.config.height,
+        ).unwrap();
+
+        self.staging_belt.finish();
 
         self.queue.submit(std::iter::once(encoder.finish()));
         output.present();
+
+        self.staging_belt.recall();
 
         Ok(())
     }
@@ -176,5 +251,4 @@ impl State {
     pub fn camera_unfirom(&self) -> &CameraUniform {
         &self.camera_uniform
     }
-
 }

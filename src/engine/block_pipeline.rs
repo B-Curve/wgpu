@@ -4,12 +4,12 @@ use crate::engine::texture::Texture;
 use crate::mesh::vertex::Vertex;
 use crate::objects::block::Block;
 use crate::scene::camera_uniform::CameraUniform;
+use crate::world::chunk::Chunk;
+use crate::world::chunk_buffer::ChunkBuffer;
+use crate::world::world::World;
 
 pub struct BlockPipeline {
     pipeline: RenderPipeline,
-    vertex_buffer: Buffer,
-    index_buffer: Buffer,
-    index_count: u32,
 
     diffuse_bind_group: BindGroup,
     diffuse_texture: Texture,
@@ -26,20 +26,6 @@ impl BlockPipeline {
         config: &SurfaceConfiguration,
         camera_uniform: &CameraUniform,
     ) -> Self {
-        let block = Block::Dirt;
-        let (vb, ib) = block.build_faces([true, true, true, true, true, true]);
-
-        let vertex_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: Some("Block Vertex Buffer"),
-            contents: bytemuck::cast_slice(&vb),
-            usage: wgpu::BufferUsages::VERTEX,
-        });
-
-        let index_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: Some("Block Index Buffer"),
-            contents: bytemuck::cast_slice(&ib),
-            usage: wgpu::BufferUsages::INDEX,
-        });
 
         let camera_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("Block Camera Buffer"),
@@ -52,8 +38,6 @@ impl BlockPipeline {
             .decode()
             .unwrap()
             .flipv();
-
-        println!("{:?}", vb);
 
         let diffuse_texture = Texture::from_image(device, queue, &diffuse_image, Some("atlas")).unwrap();
 
@@ -146,7 +130,7 @@ impl BlockPipeline {
                 entry_point: "fs_main",
                 targets: &[Some(wgpu::ColorTargetState {
                     format: config.format,
-                    blend: Some(wgpu::BlendState::REPLACE),
+                    blend: Some(wgpu::BlendState::ALPHA_BLENDING),
                     write_mask: wgpu::ColorWrites::ALL,
                 })],
             }),
@@ -176,9 +160,6 @@ impl BlockPipeline {
 
         Self {
             pipeline,
-            vertex_buffer,
-            index_buffer,
-            index_count: ib.len() as u32,
 
             diffuse_bind_group,
             diffuse_texture,
@@ -205,20 +186,46 @@ impl BlockPipeline {
 pub trait DrawBlock<'a> {
     fn draw_mesh(
         &mut self,
+        buffer: &'a ChunkBuffer,
+        pipeline: &'a BlockPipeline,
+    );
+
+    fn draw_alpha_mesh(
+        &mut self,
+        buffer: &'a ChunkBuffer,
         pipeline: &'a BlockPipeline,
     );
 }
 
 impl<'a, 'b> DrawBlock<'b> for wgpu::RenderPass<'a>
 where 'b: 'a {
-    fn draw_mesh(&mut self, pipeline: &'a BlockPipeline) {
+    fn draw_mesh(
+        &mut self,
+        buffer: &'a ChunkBuffer,
+        pipeline: &'a BlockPipeline
+    ) {
         self.set_pipeline(pipeline.pipeline());
 
         self.set_bind_group(0, &pipeline.camera_bind_group, &[]);
         self.set_bind_group(1, &pipeline.diffuse_bind_group, &[]);
 
-        self.set_vertex_buffer(0, pipeline.vertex_buffer.slice(..));
-        self.set_index_buffer(pipeline.index_buffer.slice(..), wgpu::IndexFormat::Uint32);
-        self.draw_indexed(0..pipeline.index_count, 0, 0..1);
+        self.set_vertex_buffer(0, buffer.vertex_buffer.slice(..));
+        self.set_index_buffer(buffer.index_buffer.slice(..), wgpu::IndexFormat::Uint32);
+        self.draw_indexed(0..buffer.index_count, 0, 0..1);
+    }
+
+    fn draw_alpha_mesh(
+        &mut self,
+        buffer: &'a ChunkBuffer,
+        pipeline: &'a BlockPipeline
+    ) {
+        self.set_pipeline(pipeline.pipeline());
+
+        self.set_bind_group(0, &pipeline.camera_bind_group, &[]);
+        self.set_bind_group(1, &pipeline.diffuse_bind_group, &[]);
+
+        self.set_vertex_buffer(0, buffer.alpha_vertex_buffer.slice(..));
+        self.set_index_buffer(buffer.alpha_index_buffer.slice(..), wgpu::IndexFormat::Uint32);
+        self.draw_indexed(0..buffer.alpha_index_count, 0, 0..1);
     }
 }

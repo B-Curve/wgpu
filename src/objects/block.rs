@@ -6,6 +6,8 @@ pub struct Block {
     pub id: u8,
     pub material: BlockMaterial,
     pub uv: [[u8; 2]; 6],
+    pub scale: [f32; 3],
+    pub opacity: f32,
 }
 
 impl Block {
@@ -48,7 +50,11 @@ impl Block {
 
     pub fn build_faces(
         &self,
+        x: f32,
+        y: f32,
+        z: f32,
         faces: [bool; 6],
+        index_offset: u32,
     ) -> (Vec<Vertex>, Vec<u32>) {
 
         let mut vertices = vec![];
@@ -56,7 +62,7 @@ impl Block {
         let p = &Self::POSITIONS;
         let u = &Self::UV;
         let ind = &Self::INDICES;
-        let mut i_off = 0;
+        let mut i_off = index_offset;
 
         let ux = 16.0 / 256.0;
         let uy = 16.0 / 256.0;
@@ -67,11 +73,16 @@ impl Block {
 
             for v in 0..4 {
                 vertices.push(Vertex {
-                    position: [p[i][v][0], p[i][v][1], p[i][v][2]],
+                    position: [
+                        (p[i][v][0] * self.scale[0]) + x,
+                        (p[i][v][1] * self.scale[1]) + y,
+                        (p[i][v][2] * self.scale[2]) + z,
+                    ],
                     uv: [
                         u[i][v][0] * ux + ux * uvi[i][0] as f32,
                         u[i][v][1] * uy + uy * uvi[i][1] as f32,
                     ],
+                    opacity: self.opacity,
                 });
             }
 

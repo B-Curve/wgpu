@@ -59,7 +59,7 @@ async fn run() {
 
             last_render_time = now;
 
-            app.handle_redraw_request(dt);
+            app.handle_redraw_request(dt, fps);
         },
         Event::MainEventsCleared => {
             window.request_redraw();

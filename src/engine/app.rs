@@ -60,10 +60,10 @@ impl App {
         }
     }
 
-    pub fn handle_redraw_request(&mut self, dt: Duration) {
+    pub fn handle_redraw_request(&mut self, dt: Duration, fps: u32) {
         self.state.update(dt, &mut self.block_pipeline);
 
-        match self.state.render(&self.block_pipeline) {
+        match self.state.render(&self.block_pipeline, fps) {
             Ok(_) => {},
             Err(wgpu::SurfaceError::Lost) => self.state.resize(self.state.size()),
             Err(wgpu::SurfaceError::OutOfMemory) => self.event_loop_sender.send(EventLoopRequest::Close).unwrap(),
