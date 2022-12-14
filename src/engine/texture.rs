@@ -71,8 +71,11 @@ impl Texture {
             address_mode_v: wgpu::AddressMode::ClampToEdge,
             address_mode_w: wgpu::AddressMode::ClampToEdge,
             mag_filter: wgpu::FilterMode::Nearest,
-            min_filter: wgpu::FilterMode::Nearest,
+            min_filter: wgpu::FilterMode::Linear,
             mipmap_filter: wgpu::FilterMode::Nearest,
+            anisotropy_clamp: std::num::NonZeroU8::new(8),
+            lod_min_clamp: -100.0,
+            lod_max_clamp: 1000.0,
             ..Default::default()
         });
 

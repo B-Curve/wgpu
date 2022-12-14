@@ -3,6 +3,7 @@ use crate::objects::block_material::BlockMaterial;
 
 #[derive(Debug, Copy, Clone)]
 pub struct Block {
+    pub name: &'static str,
     pub id: u8,
     pub material: BlockMaterial,
     pub uv: [[u8; 2]; 6],
@@ -12,7 +13,7 @@ pub struct Block {
 
 impl Block {
 
-    const POSITIONS: [[[f32; 3]; 4]; 6] = [
+    pub const POSITIONS: [[[f32; 3]; 4]; 6] = [
         [[0.0, 0.0, 0.0], [1.0, 0.0, 0.0], [1.0, 1.0, 0.0], [0.0, 1.0, 0.0]], // Front
         [[1.0, 0.0, 1.0], [0.0, 0.0, 1.0], [0.0, 1.0, 1.0], [1.0, 1.0, 1.0]], // Back
         [[0.0, 0.0, 1.0], [0.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 1.0, 1.0]], // Left
@@ -39,7 +40,7 @@ impl Block {
         [[0.0, 0.0], [1.0, 0.0], [1.0, 1.0], [0.0, 1.0]],
     ];
 
-    const INDICES: [[u32; 6]; 6] = [
+    pub const INDICES: [[u32; 6]; 6] = [
         [0, 1, 2, 0, 2, 3],
         [0, 1, 2, 0, 2, 3],
         [0, 1, 2, 0, 2, 3],

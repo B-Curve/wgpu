@@ -184,31 +184,37 @@ impl BlockPipeline {
 }
 
 pub trait DrawBlock<'a> {
+    fn attach_pipeline(
+        &mut self,
+        pipeline: &'a BlockPipeline,
+    );
+
     fn draw_mesh(
         &mut self,
         buffer: &'a ChunkBuffer,
-        pipeline: &'a BlockPipeline,
     );
 
     fn draw_alpha_mesh(
         &mut self,
         buffer: &'a ChunkBuffer,
-        pipeline: &'a BlockPipeline,
     );
 }
 
 impl<'a, 'b> DrawBlock<'b> for wgpu::RenderPass<'a>
 where 'b: 'a {
+    fn attach_pipeline(
+        &mut self,
+        pipeline: &'a BlockPipeline,
+    ) {
+        self.set_pipeline(pipeline.pipeline());
+        self.set_bind_group(0, &pipeline.camera_bind_group, &[]);
+        self.set_bind_group(1, &pipeline.diffuse_bind_group, &[]);
+    }
+
     fn draw_mesh(
         &mut self,
         buffer: &'a ChunkBuffer,
-        pipeline: &'a BlockPipeline
     ) {
-        self.set_pipeline(pipeline.pipeline());
-
-        self.set_bind_group(0, &pipeline.camera_bind_group, &[]);
-        self.set_bind_group(1, &pipeline.diffuse_bind_group, &[]);
-
         self.set_vertex_buffer(0, buffer.vertex_buffer.slice(..));
         self.set_index_buffer(buffer.index_buffer.slice(..), wgpu::IndexFormat::Uint32);
         self.draw_indexed(0..buffer.index_count, 0, 0..1);
@@ -217,13 +223,7 @@ where 'b: 'a {
     fn draw_alpha_mesh(
         &mut self,
         buffer: &'a ChunkBuffer,
-        pipeline: &'a BlockPipeline
     ) {
-        self.set_pipeline(pipeline.pipeline());
-
-        self.set_bind_group(0, &pipeline.camera_bind_group, &[]);
-        self.set_bind_group(1, &pipeline.diffuse_bind_group, &[]);
-
         self.set_vertex_buffer(0, buffer.alpha_vertex_buffer.slice(..));
         self.set_index_buffer(buffer.alpha_index_buffer.slice(..), wgpu::IndexFormat::Uint32);
         self.draw_indexed(0..buffer.alpha_index_count, 0, 0..1);

@@ -10,8 +10,14 @@ use crate::scene::camera::Camera;
 use crate::scene::camera_uniform::CameraUniform;
 use crate::scene::projection::Projection;
 use crate::engine::block_pipeline;
-use crate::engine::block_pipeline::{BlockPipeline, DrawBlock};
+use crate::engine::block_pipeline::BlockPipeline;
+use crate::engine::block_target_pipeline::{BlockTargetPipeline};
+use crate::engine::hotbar_pipeline::{DrawBlock, HotbarPipeline};
 use crate::engine::texture::Texture;
+use crate::objects::block_face::BlockFace;
+use crate::objects::target::Target;
+use crate::objects::target_uniform::TargetUniform;
+use crate::scene::frustum::Frustum;
 use crate::world::world::World;
 
 pub struct State {
@@ -29,6 +35,10 @@ pub struct State {
     camera: Camera,
     camera_uniform: CameraUniform,
     projection: Projection,
+    frustum: Frustum,
+
+    target_uniform: TargetUniform,
+    target: Option<Target>,
 
     world: World,
 }
@@ -47,7 +57,7 @@ impl State {
         }).await.unwrap();
 
         let (device, queue) = adapter.request_device(&wgpu::DeviceDescriptor {
-            features: wgpu::Features::empty(),
+            features: wgpu::Features::default() | wgpu::Features::POLYGON_MODE_LINE | wgpu::Features::DEPTH_CLIP_CONTROL | wgpu::Features::ADDRESS_MODE_CLAMP_TO_BORDER,
             limits: wgpu::Limits::default(),
             label: None,
         }, None).await.unwrap();
@@ -69,9 +79,13 @@ impl State {
         let projection = Projection::new(width, height, Deg(90.0), 0.1, 1000.0);
 
         let depth_texture = Texture::create_depth_texture(&device, &config, "depth_texture");
+        
+        let target_uniform = TargetUniform::new();
 
-        let mut world = World::new(8);
+        let mut world = World::new(12);
         world.generate(&camera);
+
+        let frustum = Frustum::new(&camera, &projection);
 
         let staging_belt = StagingBelt::new(1024);
 
@@ -92,6 +106,9 @@ impl State {
             depth_texture,
             camera,
             camera_uniform,
+            frustum,
+            target: None,
+            target_uniform,
             projection,
             world,
         }
@@ -119,7 +136,12 @@ impl State {
     }
 
     pub fn handle_mouse_input(&mut self, button: &MouseButton, state: &ElementState) {
-        self.camera.process_mouse_input(button.clone(), state.clone());
+        match *button {
+            MouseButton::Right => if *state == ElementState::Pressed {
+                self.world.place_block(self.target.as_ref());
+            },
+            _ => {},
+        }
     }
 
     pub fn handle_cursor_move(&mut self, position: &(f64, f64)) {
@@ -130,18 +152,27 @@ impl State {
         &mut self,
         dt: Duration,
         pipeline: &mut BlockPipeline,
+        target_pipeline: &mut BlockTargetPipeline,
+        hotbar_pipeline: &mut HotbarPipeline,
     ) {
         self.world.update(&self.device, &self.camera);
 
+        self.target = self.world.get_target(&self.camera);
+        self.target_uniform.update(self.target.as_ref());
+
         self.camera.update(dt);
         self.camera_uniform.update(&self.camera, &self.projection);
+        self.frustum.update(&self.camera, &self.projection);
 
         pipeline.update(&self.queue, &self.camera_uniform);
+        target_pipeline.update(&self.queue, &self.camera_uniform, &self.target_uniform);
     }
 
     pub fn render(
         &mut self,
         block_pipeline: &BlockPipeline,
+        target_pipeline: &BlockTargetPipeline,
+        hotbar_pipeline: &HotbarPipeline,
         fps: u32,
     ) -> Result<(), wgpu::SurfaceError> {
         let output = self.surface.get_current_texture()?;
@@ -178,25 +209,50 @@ impl State {
                 }),
             });
 
-            use crate::engine::block_pipeline::DrawBlock;
-            let buffers = self.world.buffers();
+            let buffers = self.world.buffers(&self.frustum);
 
-            buffers
-                .iter()
-                .for_each(|b| {
-                    render_pass.draw_mesh(b, block_pipeline);
-                });
+            {
+                use crate::engine::block_pipeline::DrawBlock;
+                render_pass.attach_pipeline(block_pipeline);
+                buffers
+                    .iter()
+                    .for_each(|b| {
+                        render_pass.draw_mesh(b);
+                    });
+            }
 
-            buffers
-                .iter()
-                .for_each(|b| {
-                    render_pass.draw_alpha_mesh(b, block_pipeline);
-                });
+            {
+                use crate::engine::block_target_pipeline::DrawBlock;
+                render_pass.draw_mesh(target_pipeline);
+            }
+
+            {
+                use crate::engine::block_pipeline::DrawBlock;
+                render_pass.attach_pipeline(block_pipeline);
+                buffers
+                    .iter()
+                    .for_each(|b| {
+                        render_pass.draw_alpha_mesh(b);
+                    });
+            }
+
+            {
+                use crate::engine::hotbar_pipeline::DrawBlock;
+                render_pass.draw_hotbar(hotbar_pipeline);
+            }
         }
 
         let p = self.camera.position();
 
         let (w, h) = (self.config.width as f32, self.config.height as f32);
+
+        let target_info = if let Some(target) = &self.target {
+            format!(indoc! {"
+                Targeted Block: {} [{:?}]
+            "}, target.name, target.face)
+        } else {
+            String::new()
+        };
 
         self.glyph_brush.queue(Section {
             screen_position: (5.0, 0.0),
@@ -206,7 +262,8 @@ impl State {
                     indoc! {"
                         FPS: {}
                         Position: [{:.2}, {:.2}, {:.2}]
-                    "}, fps, p.x, p.y, p.z)
+                        {}
+                    "}, fps, p.x, p.y, p.z, target_info)
                 ).with_scale(40.0).with_color([1.0, 1.0, 1.0, 1.0])
             ],
             ..Section::default()
@@ -250,5 +307,9 @@ impl State {
 
     pub fn camera_unfirom(&self) -> &CameraUniform {
         &self.camera_uniform
+    }
+
+    pub fn target_uniform(&self) -> &TargetUniform {
+        &self.target_uniform
     }
 }

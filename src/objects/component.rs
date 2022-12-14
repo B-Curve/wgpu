@@ -4,6 +4,7 @@ use crate::objects::block_material::BlockMaterial;
 impl Block {
     
     pub const Air: Block = Block {
+        name: "air",
         id: 0,
         material: BlockMaterial::Transparent,
         uv: [[0;2]; 6],
@@ -12,6 +13,7 @@ impl Block {
     };
 
     pub const Grass: Block = Block {
+        name: "grass",
         id: 1,
         material: BlockMaterial::Solid,
         uv: [
@@ -27,6 +29,7 @@ impl Block {
     };
 
     pub const Dirt: Block = Block {
+        name: "dirt",
         id: 2,
         material: BlockMaterial::Solid,
         uv: [[2, 15]; 6],
@@ -35,6 +38,7 @@ impl Block {
     };
 
     pub const Stone: Block = Block {
+        name: "stone",
         id: 3,
         material: BlockMaterial::Solid,
         uv: [[3, 15]; 6],
@@ -43,6 +47,7 @@ impl Block {
     };
 
     pub const Water: Block = Block {
+        name: "water",
         id: 4,
         material: BlockMaterial::Transparent,
         uv: [[4, 15]; 6],

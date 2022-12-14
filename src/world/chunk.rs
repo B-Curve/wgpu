@@ -15,6 +15,8 @@ pub struct Chunk {
     mesh_generated: bool,
     generating_mesh: bool,
 
+    needs_buffer: bool,
+
     sender: Sender<ChunkMesh>,
     receiver: Receiver<ChunkMesh>,
 
@@ -45,6 +47,7 @@ impl Chunk {
             },
             mesh_generated: false,
             generating_mesh: false,
+            needs_buffer: false,
             sender,
             receiver,
             left: None,
@@ -84,6 +87,7 @@ impl Chunk {
             self.mesh = mesh;
             self.generating_mesh = false;
             self.mesh_generated = true;
+            self.needs_buffer = true;
             return;
         } else if !self.mesh_generated && !self.generating_mesh {
             self.generate_mesh(pool);
@@ -306,6 +310,27 @@ impl Chunk {
         (zr, y, z)
     }
 
+    pub fn place_block_at_world_position(&mut self, (x, y, z): (i32, i32, i32)) {
+        let (lx, lz) = ((x - self.world_position.0).abs(), (z - self.world_position.1).abs());
+
+        let index = Self::xyz_to_index(lx, y, lz);
+
+        if index < (Chunk::WIDTH * Chunk::HEIGHT * Chunk::DEPTH) as usize {
+            self.blocks[index] = Block::Stone.id;
+            self.mesh_generated = false;
+        }
+    }
+
+    pub fn block_at_local_position(&self, (x, y, z): (i32, i32, i32)) -> Option<&u8> {
+        self.blocks.get(Self::xyz_to_index(x, y, z))
+    }
+
+    pub fn block_at_world_position(&self, (x, y, z): (i32, i32, i32)) -> Option<&u8> {
+        let (lx, lz) = ((x - self.world_position.0).abs(), (z - self.world_position.1).abs());
+
+        self.blocks.get(Self::xyz_to_index(lx, y, lz))
+    }
+
     pub fn local_to_world_position(local_position: (i32, i32)) -> (i32, i32) {
         (local_position.0 * Chunk::WIDTH, local_position.1 * Chunk::DEPTH)
     }
@@ -322,12 +347,20 @@ impl Chunk {
         self.left = Some(left.clone());
     }
 
+    pub fn clear_left(&mut self) {
+        self.left = None;
+    }
+
     pub fn right(&self) -> &Option<Vec<u8>> {
         &self.right
     }
 
     pub fn set_right(&mut self, right: &Vec<u8>) {
         self.right = Some(right.clone());
+    }
+
+    pub fn clear_right(&mut self) {
+        self.right = None;
     }
 
     pub fn front(&self) -> &Option<Vec<u8>> {
@@ -338,6 +371,10 @@ impl Chunk {
         self.front = Some(front.clone());
     }
 
+    pub fn clear_front(&mut self) {
+        self.front = None;
+    }
+
     pub fn back(&self) -> &Option<Vec<u8>> {
         &self.back
     }
@@ -346,11 +383,29 @@ impl Chunk {
         self.back = Some(back.clone());
     }
 
+    pub fn clear_back(&mut self) {
+        self.back = None;
+    }
+
     pub fn mesh(&self) -> &ChunkMesh {
         &self.mesh
     }
 
     pub fn has_mesh(&self) -> bool {
         self.mesh_generated
+    }
+
+    pub fn local_position(&self) -> (i32, i32) { self.local_position }
+
+    pub fn world_position(&self) -> (i32, i32) {
+        self.world_position
+    }
+
+    pub fn needs_buffer(&self) -> bool {
+        self.needs_buffer
+    }
+
+    pub fn set_needs_buffer(&mut self, needs_buffer: bool) {
+        self.needs_buffer = needs_buffer;
     }
 }
