@@ -44,7 +44,7 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     if (in.target_position.y < 0.0) {
         return vec4<f32>(1.0, 1.0, 1.0, 0.0);
     } else if ((xf < 0.01 && yf < 0.01) || (xf < 0.01 && zf < 0.01) || (yf < 0.01 && zf < 0.01)) {
-        return vec4<f32>(0.0, 1.0, 0.0, 1.0);
+        return vec4<f32>(1.0, 1.0, 0.0, 1.0);
     } else {
         return vec4<f32>(1.0, 1.0, 1.0, 0.0);
     }

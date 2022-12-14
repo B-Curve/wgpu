@@ -310,13 +310,13 @@ impl Chunk {
         (zr, y, z)
     }
 
-    pub fn place_block_at_world_position(&mut self, (x, y, z): (i32, i32, i32)) {
+    pub fn place_block_at_world_position(&mut self, block: &Block, (x, y, z): (i32, i32, i32)) {
         let (lx, lz) = ((x - self.world_position.0).abs(), (z - self.world_position.1).abs());
 
         let index = Self::xyz_to_index(lx, y, lz);
 
         if index < (Chunk::WIDTH * Chunk::HEIGHT * Chunk::DEPTH) as usize {
-            self.blocks[index] = Block::Stone.id;
+            self.blocks[index] = block.id;
             self.mesh_generated = false;
         }
     }
@@ -407,5 +407,9 @@ impl Chunk {
 
     pub fn set_needs_buffer(&mut self, needs_buffer: bool) {
         self.needs_buffer = needs_buffer;
+    }
+
+    pub fn set_mesh_generated(&mut self, mesh_generated: bool) {
+        self.mesh_generated = mesh_generated;
     }
 }

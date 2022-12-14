@@ -211,6 +211,49 @@ impl World {
         nearest_block
     }
 
+    pub fn remove_block(&mut self, target: Option<&Target>) {
+        if let Some(target) = target {
+            let p = target.position;
+            let p = vec3(p.x.floor() as i32, p.y.floor() as i32, p.z.floor() as i32);
+
+            let chunk = self.get_chunk(p.x, p.y, p.z).unwrap();
+
+            let (lx, lz) = {
+                let pp = chunk.borrow().world_position();
+                ((p.x - pp.0).abs(), (p.z - pp.1).abs())
+            };
+
+            let (cx, cz) = chunk.borrow().local_position();
+
+            chunk.borrow_mut().place_block_at_world_position(&Block::Air, (p.x, p.y, p.z));
+            let c = chunk;
+
+            if lx == 0 {
+                if let Some(chunk) = self.chunks.get(&(cx - 1, cz)) {
+                    chunk.borrow_mut().set_right(c.borrow().blocks());
+                    chunk.borrow_mut().set_mesh_generated(false);
+                }
+            } else if lx == Chunk::WIDTH - 1 {
+                if let Some(chunk) = self.chunks.get(&(cx + 1, cz)) {
+                    chunk.borrow_mut().set_left(c.borrow().blocks());
+                    chunk.borrow_mut().set_mesh_generated(false);
+                }
+            }
+
+            if lz == 0 {
+                if let Some(chunk) = self.chunks.get(&(cx, cz - 1)) {
+                    chunk.borrow_mut().set_back(c.borrow().blocks());
+                    chunk.borrow_mut().set_mesh_generated(false);
+                }
+            } else if lz == Chunk::DEPTH - 1 {
+                if let Some(chunk) = self.chunks.get(&(cx, cz + 1)) {
+                    chunk.borrow_mut().set_front(c.borrow().blocks());
+                    chunk.borrow_mut().set_mesh_generated(false);
+                }
+            }
+        }
+    }
+
     pub fn place_block(&mut self, target: Option<&Target>) {
         if let Some(target) = target {
             let p = target.position;
@@ -237,23 +280,31 @@ impl World {
 
             let (cx, cz) = chunk.borrow().local_position();
 
-            chunk.borrow_mut().place_block_at_world_position((s.x, s.y, s.z));
+            chunk.borrow_mut().place_block_at_world_position(&Block::Stone, (s.x, s.y, s.z));
+
+            let c = chunk;
 
             if lx == 0 {
                 if let Some(chunk) = self.chunks.get(&(cx - 1, cz)) {
-                    chunk.borrow_mut().clear_right();
+                    chunk.borrow_mut().set_right(c.borrow().blocks());
+                    chunk.borrow_mut().set_mesh_generated(false);
                 }
             } else if lx == Chunk::WIDTH - 1 {
                 if let Some(chunk) = self.chunks.get(&(cx + 1, cz)) {
-                    chunk.borrow_mut().clear_left();
+                    chunk.borrow_mut().set_left(c.borrow().blocks());
+                    chunk.borrow_mut().set_mesh_generated(false);
                 }
-            } else if lz == 0 {
+            }
+
+            if lz == 0 {
                 if let Some(chunk) = self.chunks.get(&(cx, cz - 1)) {
-                    chunk.borrow_mut().clear_back();
+                    chunk.borrow_mut().set_back(c.borrow().blocks());
+                    chunk.borrow_mut().set_mesh_generated(false);
                 }
             } else if lz == Chunk::DEPTH - 1 {
                 if let Some(chunk) = self.chunks.get(&(cx, cz + 1)) {
-                    chunk.borrow_mut().clear_front();
+                    chunk.borrow_mut().set_front(c.borrow().blocks());
+                    chunk.borrow_mut().set_mesh_generated(false);
                 }
             }
         }

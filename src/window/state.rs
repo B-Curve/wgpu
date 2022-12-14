@@ -140,6 +140,9 @@ impl State {
             MouseButton::Right => if *state == ElementState::Pressed {
                 self.world.place_block(self.target.as_ref());
             },
+            MouseButton::Left => if *state == ElementState::Pressed {
+                self.world.remove_block(self.target.as_ref());
+            },
             _ => {},
         }
     }
